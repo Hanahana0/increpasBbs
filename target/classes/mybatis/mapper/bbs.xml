@@ -1,0 +1,87 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!DOCTYPE mapper
+  PUBLIC "-//mybatis.org//DTD Mapper 3.0//EN"
+  "http://mybatis.org/dtd/mybatis-3-mapper.dtd">
+<mapper namespace="bbs">
+	
+	<resultMap id="map1" type="mybatis.vo.BbsVO">
+		<id property="b_idx" column="b_idx"/>
+		<!-- 원글 하나에 여러 개의 댓글들이 존재할 수 있으므로
+			집합구조를 일대 다관계에 맞는 collection을 선언한다. -->
+		<collection property="c_list" ofType="mybatis.vo.CommVO" 
+			select="commList" column="b_idx"/>
+	</resultMap>
+	
+	<!-- 특정 게시물의 기본키인 b_idx를 받아서 해당 게시물의 댓글들을 모두 반환한다. -->
+	<select id="commList" parameterType="String" 
+	resultType="mybatis.vo.CommVO">
+		SELECT * FROM comment_t
+		WHERE b_idx = #{b_idx}
+	</select>
+	
+	<!-- 게시물을 검색하는 친구 -->
+	<select id="List" resultMap="map1" parameterType="java.util.Map">
+		SELECT * FROM (
+			SELECT rownum r_num,a.* FROM (SELECT * FROM bbs_t
+							WHERE status = 0 AND bname = #{bname}
+							 <if test="subject != null">
+							 	AND upper(subject) like '%'||upper(#{subject, jdbcType=VARCHAR})||'%'
+							 </if>
+							ORDER BY b_idx DESC
+			) a
+		) WHERE r_num BETWEEN #{begin} AND #{end}
+	</select>
+	
+	<!-- 게시물을 가져오는 친구! -->
+	<!-- 이 때 리솔맵으로해야함 왜와이 게시물을 댓글과 연결되오ㅓ있는데 댓글을 가져오기 위해서다! -->
+	<select id="getBbs" resultMap="map1" parameterType="String">
+		select * from bbs_t
+		where status = 0 and b_idx = #{b_idx}
+	</select>
+	
+	<!-- 원글을 저장하는 친구! -->
+	<insert id="add" parameterType="mybatis.vo.BbsVO">
+		INSERT INTO bbs_t(b_idx, subject, writer, content,
+			file_name, ori_name, pwd, write_date, ip, hit, status, bname)
+		VALUES(bbs_t_seq.NEXTVAL, #{subject}, #{writer}, #{content},
+			#{file_name, jdbcType=VARCHAR },
+			#{ori_name, jdbcType=VARCHAR }, #{pwd}, sysdate, #{ip}, 0, 0, #{bname})
+	</insert>
+	<!-- 댓글을 저장하는 친구 -->
+	<insert id="addAns" parameterType="mybatis.vo.CommVO">
+		INSERT INTO comment_t(c_idx, writer, content, write_date,
+			ip, pwd, b_idx)
+		VALUES(comment_t_seq.NEXTVAL, #{writer}, #{content}, sysdate,
+			#{ip}, #{pwd}, #{b_idx})
+	</insert>
+	
+	<!-- 게시물 수정해주는 친구 -->
+	<update id="edit" parameterType="mybatis.vo.BbsVO">
+		UPDATE bbs_t SET
+			subject = #{subject},
+			content = #{content}
+				<if test="file_name != null">
+					,file_name = #{file_name}
+					,ori_name = #{ori_name}
+				</if>
+		WHERE b_idx = #{b_idx} AND pwd = #{pwd}
+	</update>
+	
+	<!-- 게시물수 반환하는친구 ! -->
+	<select id="totalCount" resultType="int" parameterType="String">
+		select count(*) from bbs_t
+		where status = 0 and bname = #{bname}
+	</select>
+	<!-- 게시물 삭제하는친구 진짜삭제가 아니라 스테이터스를 1로 바꿔서 안보이게하는거다 -->
+	<update id="del" parameterType="String">
+		update bbs_t set
+			status = 1
+			where b_idx = ${b_idx}
+	</update>
+	
+</mapper>
+
+
+
+
+
